@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Banca · Controle de Apostas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Narrow:wght@600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<!-- ===== TELA DE LOGIN ===== -->
+<div id="authScreen" class="auth-screen">
+  <div class="auth-box">
+    <div class="brand center">
+      <div class="chip"></div>
+      <div><span>Sua banca</span><h1>Banca</h1></div>
+    </div>
+    <p class="auth-sub">Entre para acessar seu controle de apostas.</p>
+    <div class="form-grid one">
+      <label class="f">E-mail<input type="email" id="authEmail" placeholder="voce@email.com" autocomplete="email"></label>
+      <label class="f">Senha<input type="password" id="authSenha" placeholder="••••••••" autocomplete="current-password"></label>
+    </div>
+    <div id="authMsg" class="auth-msg"></div>
+    <div class="auth-actions">
+      <button class="acao full" id="btnEntrar">Entrar</button>
+      <button class="ghost full" id="btnCadastrar">Criar conta</button>
+    </div>
+    <p class="auth-hint">Seus dados ficam protegidos e visíveis só para você.</p>
+  </div>
+</div>
+
+<!-- ===== APP ===== -->
+<div id="appScreen">
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <div class="chip"></div>
+      <div><span>Sua banca</span><h1>Banca</h1></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:20px">
+      <div class="banca-total">
+        <small>Saldo total nas casas</small>
+        <div class="v num" id="bancaTotal">R$ 0,00</div>
+      </div>
+      <button class="ghost" id="btnSair">Sair</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="tabs">
+    <button class="ativo" data-tab="painel">Painel</button>
+    <button data-tab="apostas">Apostas</button>
+    <button data-tab="casas">Casas & banca</button>
+    <button data-tab="grupos">Grupos / meios</button>
+  </nav>
+
+  <!-- PAINEL -->
+  <section id="tab-painel">
+    <div class="filtros">
+      <label class="f">De<input type="date" id="fDe"></label>
+      <label class="f">Até<input type="date" id="fAte"></label>
+      <div class="chips-periodo">
+        <button data-p="hoje">Hoje</button>
+        <button data-p="7">7 dias</button>
+        <button data-p="mes" class="ativo">Mês</button>
+        <button data-p="tudo">Tudo</button>
+      </div>
+    </div>
+
+    <div class="grid-resumo">
+      <div class="card kpi"><small>Resultado do período</small><div class="big num" id="kpiLucro">R$ 0,00</div></div>
+      <div class="card kpi"><small>Total apostado</small><div class="big num gold" id="kpiApostado">R$ 0,00</div></div>
+      <div class="card kpi"><small>Ganho estimado em aberto</small><div class="big num" id="kpiEstimado" style="color:var(--pendente)">R$ 0,00</div></div>
+      <div class="card kpi"><small>Saldo nas casas</small><div class="big num gold" id="kpiSaldo">R$ 0,00</div></div>
+    </div>
+    <div class="grid-resumo">
+      <div class="card kpi"><small>Apostas no período</small><div class="big num" id="kpiQtd">0</div></div>
+      <div class="card kpi"><small>Taxa de acerto</small><div class="big num" id="kpiTaxa">0%</div></div>
+      <div class="card kpi"><small>ROI (retorno s/ apostado)</small><div class="big num" id="kpiRoi">0%</div></div>
+      <div class="card kpi"><small>Em aberto (pendentes)</small><div class="big num" id="kpiPendentes">0</div></div>
+    </div>
+
+    <div class="secao"><h2>Resultado por casa</h2><div id="porCasa"></div></div>
+    <div class="secao"><h2>Resultado por grupo / meio</h2><div id="porGrupo"></div></div>
+  </section>
+
+  <!-- APOSTAS -->
+  <section id="tab-apostas" class="hidden">
+    <div class="secao">
+      <div class="secao-head">
+        <h2 style="margin:0">Histórico de apostas</h2>
+        <button class="acao" id="btnNovaAposta">+ Nova aposta</button>
+      </div>
+      <div id="tabelaApostas"></div>
+    </div>
+  </section>
+
+  <!-- CASAS -->
+  <section id="tab-casas" class="hidden">
+    <div class="secao">
+      <h2>Adicionar casa</h2>
+      <div class="form-grid">
+        <label class="f">Nome da casa<input type="text" id="cNome" placeholder="Ex: Bet365"></label>
+        <label class="f">Saldo atual (R$)<input type="number" id="cSaldo" step="0.01" placeholder="0,00"></label>
+      </div>
+      <button class="acao" id="btnAddCasa">Adicionar casa</button>
+    </div>
+    <div class="secao"><h2>Minhas casas e saldos</h2>
+      <p class="dica" style="margin-bottom:14px">O saldo sobe e desce sozinho conforme você marca Green/Red. Você também pode ajustar manualmente (depósitos e saques).</p>
+      <div class="lista-casas" id="listaCasas"></div>
+    </div>
+  </section>
+
+  <!-- GRUPOS -->
+  <section id="tab-grupos" class="hidden">
+    <div class="secao">
+      <h2>Adicionar grupo / meio</h2>
+      <div class="form-grid"><label class="f full">Nome<input type="text" id="gNome" placeholder="Ex: Grupo Telegram VIP, análise própria..."></label></div>
+      <button class="acao" id="btnAddGrupo">Adicionar grupo</button>
+    </div>
+    <div class="secao"><h2>Meus grupos / meios</h2><div class="pills" id="listaGrupos"></div></div>
+  </section>
+</div>
+</div>
+
+<!-- ===== MODAL NOVA APOSTA ===== -->
+<div id="modalAposta" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="formTitulo">Nova aposta</h2>
+      <button class="modal-x" id="btnFecharModal">✕</button>
+    </div>
+    <div class="form-grid">
+      <label class="f">Casa<select id="aCasa"></select></label>
+      <label class="f">Grupo / meio<select id="aGrupo"></select></label>
+      <label class="f">Valor apostado (R$)<input type="number" id="aValor" step="0.01" placeholder="0,00"></label>
+      <label class="f">Odd<input type="number" id="aOdd" step="0.01" placeholder="ex: 1.85"></label>
+      <label class="f">Ganho estimado (R$)<input type="number" id="aRetorno" step="0.01" placeholder="calculado automaticamente"></label>
+      <label class="f">Data<input type="date" id="aData"></label>
+      <label class="f">Resultado<select id="aResultado">
+        <option value="pendente">Pendente</option>
+        <option value="ganhou">Green (ganhou)</option>
+        <option value="perdeu">Red (perdeu)</option>
+        <option value="devolvida">Devolvida</option>
+      </select></label>
+      <label class="f full">Descrição<textarea id="aDescricao" placeholder="Ex: Flamengo vencer + ambas marcam"></textarea></label>
+    </div>
+    <p class="dica" style="margin-bottom:14px">O ganho estimado é calculado sozinho (valor × odd). Marcar Green credita o lucro na banca da casa.</p>
+    <div class="modal-foot">
+      <button class="ghost" id="btnCancelarModal">Cancelar</button>
+      <button class="acao" id="btnSalvarAposta">Registrar aposta</button>
+    </div>
+  </div>
+</div>
+
+<!-- Menu flutuante de resultado rápido -->
+<div id="menuResultado" class="menu-result hidden">
+  <button data-r="ganhou" class="mr-green">✓ Green</button>
+  <button data-r="perdeu" class="mr-red">✕ Red</button>
+  <button data-r="devolvida" class="mr-dev">↺ Devolvida</button>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/app.js"></script>
+</body>
+</html>
