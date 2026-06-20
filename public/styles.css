@@ -114,13 +114,9 @@ tr:hover td{background:#0d1411}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--feltro-claro);border:1px solid var(--dourado);color:var(--creme);padding:13px 24px;border-radius:10px;font-size:14px;z-index:99;opacity:0;transition:.3s;pointer-events:none}
 .toast.show{opacity:1}
 
-@media(max-width:860px){
-  .grid-resumo{grid-template-columns:repeat(2,1fr)}
-  .form-grid{grid-template-columns:repeat(2,1fr)}
-  table{font-size:13px}th:nth-child(4),td:nth-child(4){display:none}
-  .chips-periodo{margin-left:0}
-}
-@media(max-width:520px){.form-grid{grid-template-columns:1fr}th:nth-child(6),td:nth-child(6){display:none}}
+/* estilos da barra de filtros da aba apostas */
+.filtros-apostas{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+.filtros-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
 
 /* ===== SEPARACAO DE TELAS (robusta) ===== */
 .hidden{display:none !important}
@@ -140,3 +136,63 @@ body.logado #authScreen{display:none}
 .modal-x{background:transparent;border:none;color:var(--cinza);font-size:20px;cursor:pointer;line-height:1;padding:4px 8px}
 .modal-x:hover{color:var(--creme)}
 .modal-foot{display:flex;justify-content:flex-end;gap:10px}
+
+/* ================= RESPONSIVO ================= */
+@media(max-width:900px){
+  .grid-resumo{grid-template-columns:repeat(2,1fr)}
+  .form-grid{grid-template-columns:repeat(2,1fr)}
+  .filtros-apostas{grid-template-columns:repeat(2,1fr)}
+  .chips-periodo{margin-left:0}
+}
+
+@media(max-width:600px){
+  .wrap{padding:0 12px 60px}
+  header.top{padding:16px 0 14px;margin-bottom:18px}
+  .top-in{padding:0 12px;gap:10px}
+  .brand h1{font-size:21px}
+  .chip{width:34px;height:34px}
+  .banca-total .v{font-size:22px}
+  #btnSair{padding:7px 12px;font-size:12px}
+
+  /* abas roláveis na horizontal */
+  nav.tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;gap:6px;padding-bottom:4px}
+  nav.tabs button{flex:0 0 auto;padding:10px 16px}
+
+  .grid-resumo{grid-template-columns:repeat(2,1fr);gap:10px}
+  .card{padding:14px}
+  .card.kpi .big{font-size:23px}
+  .secao{padding:16px;border-radius:14px}
+  .form-grid,.filtros-apostas{grid-template-columns:1fr}
+  .filtros{padding:14px}
+
+  .secao-head{flex-direction:column;align-items:stretch}
+  .secao-head .acao{width:100%}
+
+  /* campos maiores e sem zoom no foco (font 16px) */
+  input,select,textarea{font-size:16px;padding:12px}
+  button.acao{padding:13px 20px;font-size:15px}
+
+  /* modal ocupa a tela toda */
+  .modal-overlay{padding:0}
+  .modal-box{max-width:100%;min-height:100%;border-radius:0;border:none;padding:20px 16px 40px}
+
+  /* ---- TABELA VIRA CARTOES ---- */
+  .tbl-apostas thead{display:none}
+  .tbl-apostas,.tbl-apostas tbody,.tbl-apostas tr,.tbl-apostas td{display:block;width:100%}
+  .tbl-apostas tr{background:#0c1310;border:1px solid var(--linha);border-radius:13px;padding:14px;margin-bottom:12px}
+  .tbl-apostas tr:hover td{background:transparent}
+  .tbl-apostas td{border:none;padding:5px 0;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .tbl-apostas td::before{content:attr(data-label);font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--cinza);font-weight:600;flex-shrink:0}
+  .tbl-apostas td.cel-casa{font-family:'Archivo Narrow';font-size:18px;font-weight:700;text-transform:uppercase;border-bottom:1px solid var(--linha);padding-bottom:10px;margin-bottom:4px}
+  .tbl-apostas td.cel-casa::before{content:'';}
+  .tbl-apostas td[data-label="Descrição"]{flex-direction:column;align-items:flex-start;gap:4px;background:#0a100d;border:1px solid var(--linha);border-radius:9px;padding:10px 12px;margin:6px 0}
+  .tbl-apostas td[data-label="Descrição"]::before{content:'Descrição';color:var(--dourado)}
+  .tbl-apostas td[data-label="Descrição"]{font-size:14px;line-height:1.45;white-space:normal;word-break:break-word}
+  .tbl-apostas td .tag{font-size:13px;padding:6px 14px}
+  .tbl-apostas td.cel-acoes{justify-content:flex-end;border-top:1px solid var(--linha);padding-top:10px;margin-top:4px}
+  .tbl-apostas td.cel-acoes::before{content:'';}
+  .tbl-apostas td.cel-acoes .mini{font-size:14px;padding:6px 12px}
+
+  .lista-casas{grid-template-columns:1fr}
+  .menu-result button{padding:12px 20px;font-size:15px}
+}

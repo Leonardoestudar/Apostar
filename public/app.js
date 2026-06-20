@@ -114,6 +114,10 @@ async function carregar() {
 function preencherSelects() {
   $('aCasa').innerHTML = casas.length ? casas.map(c => `<option value="${c.id}">${c.nome}</option>`).join('') : '<option value="">— cadastre uma casa —</option>';
   $('aGrupo').innerHTML = '<option value="">— sem grupo —</option>' + grupos.map(g => `<option value="${g.id}">${g.nome}</option>`).join('');
+  // filtros da aba apostas (preserva seleção atual)
+  const fc = $('filCasa'), fg = $('filGrupo');
+  if (fc) { const v = fc.value; fc.innerHTML = '<option value="">Todas</option>' + casas.map(c => `<option value="${c.id}">${c.nome}</option>`).join(''); fc.value = v; }
+  if (fg) { const v = fg.value; fg.innerHTML = '<option value="">Todos</option>' + grupos.map(g => `<option value="${g.id}">${g.nome}</option>`).join(''); fg.value = v; }
 }
 
 // ============ PAINEL ============
@@ -163,23 +167,65 @@ function agrupar(lista, campo, ref, incluirSem) {
 }
 
 // ============ APOSTAS ============
+function apostasDaAba() {
+  const fCasa = $('filCasa')?.value || '';
+  const fGrupo = $('filGrupo')?.value || '';
+  const fRes = $('filResultado')?.value || '';
+  const vMin = $('filValMin')?.value !== '' ? Number($('filValMin').value) : null;
+  const vMax = $('filValMax')?.value !== '' ? Number($('filValMax').value) : null;
+  const de = $('filDe')?.value || '';
+  const ate = $('filAte')?.value || '';
+  const busca = ($('filBusca')?.value || '').toLowerCase().trim();
+  return apostas.filter(a => {
+    if (fCasa && a.casa_id !== fCasa) return false;
+    if (fGrupo && (a.grupo_id || '') !== fGrupo) return false;
+    if (fRes && a.resultado !== fRes) return false;
+    if (vMin !== null && Number(a.valor) < vMin) return false;
+    if (vMax !== null && Number(a.valor) > vMax) return false;
+    if (de && a.data_aposta < de) return false;
+    if (ate && a.data_aposta > ate) return false;
+    if (busca && !((a.descricao || '').toLowerCase().includes(busca) || (a.casas?.nome || '').toLowerCase().includes(busca))) return false;
+    return true;
+  });
+}
+
 function renderApostas() {
-  const lista = apostas;
-  if (!lista.length) { $('tabelaApostas').innerHTML = '<div class="empty">Registre sua primeira aposta acima.</div>'; return; }
-  $('tabelaApostas').innerHTML = `<table><thead><tr>
+  if (!apostas.length) { $('tabelaApostas').innerHTML = '<div class="empty">Registre sua primeira aposta no botão + Nova aposta.</div>'; if ($('filResumo')) $('filResumo').textContent = ''; return; }
+  const lista = apostasDaAba();
+  if ($('filResumo')) {
+    const tot = lista.reduce((s, a) => s + Number(a.lucro), 0);
+    $('filResumo').innerHTML = `${lista.length} aposta(s) · resultado <strong class="${tot >= 0 ? 'pos' : 'neg'}">${brl(tot)}</strong>`;
+  }
+  if (!lista.length) { $('tabelaApostas').innerHTML = '<div class="empty">Nenhuma aposta com esses filtros.</div>'; return; }
+  $('tabelaApostas').innerHTML = `<table class="tbl-apostas"><thead><tr>
     <th>Data</th><th>Casa</th><th>Grupo</th><th>Descrição</th><th>Valor</th><th>Odd</th><th>Resultado</th><th>Lucro</th><th></th></tr></thead><tbody>${lista.map(a => {
       const d = a.data_aposta.split('-').reverse().join('/');
       const lc = Number(a.lucro) > 0 ? 'pos' : Number(a.lucro) < 0 ? 'neg' : '';
       const label = { ganhou: 'green', perdeu: 'red', devolvida: 'devolvida', pendente: 'pendente' }[a.resultado];
       return `<tr>
-        <td class="num">${d}</td><td>${a.casas?.nome || '—'}</td><td>${a.grupos?.nome || '—'}</td>
-        <td>${a.descricao || '—'}</td><td class="num">${brl(a.valor)}</td><td class="num">${a.odd || '—'}</td>
-        <td><span class="tag t-${a.resultado}" onclick="abrirMenu(event,'${a.id}')">${label} ▾</span></td>
-        <td class="num ${lc}"><strong>${brl(a.lucro)}</strong></td>
-        <td style="white-space:nowrap"><button class="mini" style="color:var(--dourado)" onclick="editar('${a.id}')">editar</button><button class="mini" onclick="excluirAposta('${a.id}')">excluir</button></td>
+        <td data-label="Data" class="num">${d}</td>
+        <td data-label="Casa" class="cel-casa">${a.casas?.nome || '—'}</td>
+        <td data-label="Grupo">${a.grupos?.nome || '—'}</td>
+        <td data-label="Descrição">${a.descricao || '—'}</td>
+        <td data-label="Valor" class="num">${brl(a.valor)}</td>
+        <td data-label="Odd" class="num">${a.odd || '—'}</td>
+        <td data-label="Resultado"><span class="tag t-${a.resultado}" onclick="abrirMenu(event,'${a.id}')">${label} ▾</span></td>
+        <td data-label="Lucro" class="num ${lc}"><strong>${brl(a.lucro)}</strong></td>
+        <td class="cel-acoes" style="white-space:nowrap"><button class="mini" style="color:var(--dourado)" onclick="editar('${a.id}')">editar</button><button class="mini" onclick="excluirAposta('${a.id}')">excluir</button></td>
       </tr>`;
     }).join('')}</tbody></table>`;
 }
+
+// liga os filtros
+['filCasa', 'filGrupo', 'filResultado', 'filValMin', 'filValMax', 'filDe', 'filAte', 'filBusca'].forEach(id => {
+  const el = $(id); if (!el) return;
+  el.addEventListener('input', renderApostas);
+  el.addEventListener('change', renderApostas);
+});
+$('btnLimparFiltros') && ($('btnLimparFiltros').onclick = () => {
+  ['filCasa', 'filGrupo', 'filResultado', 'filValMin', 'filValMax', 'filDe', 'filAte', 'filBusca'].forEach(id => { if ($(id)) $(id).value = ''; });
+  renderApostas();
+});
 
 // cálculo automático valor × odd
 function recalcEstimado() {

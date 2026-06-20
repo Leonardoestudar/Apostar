@@ -95,6 +95,28 @@
         <h2 style="margin:0">Histórico de apostas</h2>
         <button class="acao" id="btnNovaAposta">+ Nova aposta</button>
       </div>
+
+      <div class="filtros-apostas">
+        <label class="f">Casa<select id="filCasa"><option value="">Todas</option></select></label>
+        <label class="f">Grupo<select id="filGrupo"><option value="">Todos</option></select></label>
+        <label class="f">Resultado<select id="filResultado">
+          <option value="">Todos</option>
+          <option value="ganhou">Green</option>
+          <option value="perdeu">Red</option>
+          <option value="devolvida">Devolvida</option>
+          <option value="pendente">Pendente</option>
+        </select></label>
+        <label class="f">Valor mín. (R$)<input type="number" id="filValMin" step="0.01" placeholder="0"></label>
+        <label class="f">Valor máx. (R$)<input type="number" id="filValMax" step="0.01" placeholder="∞"></label>
+        <label class="f">De<input type="date" id="filDe"></label>
+        <label class="f">Até<input type="date" id="filAte"></label>
+        <label class="f">Buscar<input type="text" id="filBusca" placeholder="descrição..."></label>
+      </div>
+      <div class="filtros-bar">
+        <span class="dica" id="filResumo"></span>
+        <button class="ghost" id="btnLimparFiltros">Limpar filtros</button>
+      </div>
+
       <div id="tabelaApostas"></div>
     </div>
   </section>
