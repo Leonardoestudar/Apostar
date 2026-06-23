@@ -1,6 +1,8 @@
 let sb, user = null;
 let casas = [], grupos = [], apostas = [], editandoId = null;
 let filtroDe = null, filtroAte = null, menuApostaId = null;
+let config = { banco: 0, limite_perda_dia: 0 };
+let selecionadas = new Set();
 
 const $ = (id) => document.getElementById(id);
 const brl = (n) => (Number(n) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -101,14 +103,16 @@ function apostasFiltradas() {
 
 // ============ CARREGAR ============
 async function carregar() {
-  const [c, g, a] = await Promise.all([
+  const [c, g, a, cf] = await Promise.all([
     sb.from('casas').select('*').order('nome'),
     sb.from('grupos').select('*').order('nome'),
-    sb.from('apostas').select('*, casas(nome), grupos(nome)').order('data_aposta', { ascending: false }).order('criado_em', { ascending: false })
+    sb.from('apostas').select('*, casas(nome), grupos(nome)').order('data_aposta', { ascending: false }).order('criado_em', { ascending: false }),
+    sb.from('config').select('*').eq('user_id', user.id).maybeSingle()
   ]);
   if (c.error || g.error || a.error) { toast('Erro ao carregar dados.'); return; }
   casas = c.data; grupos = g.data; apostas = a.data;
-  preencherSelects(); renderCasas(); renderGrupos(); renderApostas(); renderPainel();
+  config = (cf && !cf.error && cf.data) ? cf.data : { banco: 0, limite_perda_dia: 0 };
+  preencherSelects(); renderBanco(); renderCasas(); renderGrupos(); renderApostas(); renderPainel();
 }
 
 function preencherSelects() {
@@ -136,8 +140,8 @@ function renderPainel() {
   $('kpiLucro').textContent = brl(lucro); $('kpiLucro').className = 'big num ' + (lucro >= 0 ? 'pos' : 'neg');
   $('kpiApostado').textContent = brl(apostado);
   $('kpiEstimado').textContent = brl(estimado);
-  $('kpiSaldo').textContent = brl(saldo);
-  $('bancaTotal').textContent = brl(saldo);
+  $('kpiSaldo').textContent = brl(patrimonio());
+  $('bancaTotal').textContent = brl(patrimonio());
   $('kpiQtd').textContent = lista.length;
   $('kpiTaxa').textContent = taxa + '%';
   $('kpiRoi').textContent = roi + '%'; $('kpiRoi').className = 'big num ' + (roi >= 0 ? 'pos' : 'neg');
@@ -145,6 +149,126 @@ function renderPainel() {
 
   $('porCasa').innerHTML = agrupar(lista, 'casa_id', casas) || '<div class="empty">Sem apostas no período.</div>';
   $('porGrupo').innerHTML = agrupar(lista, 'grupo_id', grupos, true) || '<div class="empty">Sem apostas com grupo no período.</div>';
+
+  renderAlertaLimite();
+  renderGrafico(lista);
+  renderComparativos();
+}
+
+// inclui o saldo do Banco no total exibido no topo
+function patrimonio() {
+  return casas.reduce((s, c) => s + Number(c.saldo), 0) + Number(config.banco || 0);
+}
+
+// ===== Alerta de limite de perda diário =====
+function renderAlertaLimite() {
+  const el = $('alertaLimite'); if (!el) return;
+  const limite = Number(config.limite_perda_dia) || 0;
+  if (limite <= 0) { el.classList.add('hidden'); return; }
+  const hojeStr = hoje();
+  const perdaHoje = apostas.filter(a => a.data_aposta === hojeStr).reduce((s, a) => s + Number(a.lucro), 0);
+  if (perdaHoje >= 0) { el.classList.add('hidden'); return; }
+  const perda = Math.abs(perdaHoje);
+  el.classList.remove('hidden');
+  if (perda >= limite) {
+    el.className = 'alerta-limite estouro';
+    el.innerHTML = `⚠ Você atingiu seu limite de perda do dia (${brl(perda)} de ${brl(limite)}). Considere parar por hoje.`;
+  } else if (perda >= limite * 0.8) {
+    el.className = 'alerta-limite aviso';
+    el.innerHTML = `⚠ Atenção: perda de hoje em ${brl(perda)}, perto do limite de ${brl(limite)}.`;
+  } else {
+    el.classList.add('hidden');
+  }
+}
+
+// ===== Gráfico de evolução da banca (lucro acumulado por dia) =====
+function renderGrafico(lista) {
+  const cont = $('grafico'); if (!cont) return;
+  const fechadas = lista.filter(a => a.resultado !== 'pendente');
+  if (fechadas.length < 2) { cont.innerHTML = '<div class="empty">Registre apostas com resultado para ver a curva.</div>'; return; }
+  // soma lucro por dia
+  const porDia = {};
+  fechadas.forEach(a => { porDia[a.data_aposta] = (porDia[a.data_aposta] || 0) + Number(a.lucro); });
+  const dias = Object.keys(porDia).sort();
+  let acc = 0;
+  const pts = dias.map(d => { acc += porDia[d]; return { d, v: acc }; });
+
+  const W = 760, H = 240, pad = { t: 16, r: 16, b: 28, l: 56 };
+  const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
+  const vals = pts.map(p => p.v).concat([0]);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = (max - min) || 1;
+  const x = i => pad.l + (pts.length === 1 ? iw / 2 : i / (pts.length - 1) * iw);
+  const y = v => pad.t + ih - ((v - min) / range) * ih;
+  const linha = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+  const area = `${linha} L${x(pts.length - 1).toFixed(1)},${y(min).toFixed(1)} L${x(0).toFixed(1)},${y(min).toFixed(1)} Z`;
+  const zeroY = y(0);
+  const cor = acc >= 0 ? 'var(--verde)' : 'var(--vermelho)';
+  const fmtData = s => s.slice(8, 10) + '/' + s.slice(5, 7);
+  // rótulos do eixo X (no máx 6)
+  const passo = Math.ceil(pts.length / 6);
+  const labelsX = pts.map((p, i) => (i % passo === 0 || i === pts.length - 1)
+    ? `<text x="${x(i)}" y="${H - 8}" fill="var(--cinza)" font-size="11" text-anchor="middle" font-family="Oswald">${fmtData(p.d)}</text>` : '').join('');
+
+  cont.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="graf-svg" preserveAspectRatio="xMidYMid meet">
+    <line x1="${pad.l}" y1="${zeroY}" x2="${W - pad.r}" y2="${zeroY}" stroke="var(--linha)" stroke-dasharray="4 4"/>
+    <text x="${pad.l - 8}" y="${y(max) + 4}" fill="var(--cinza)" font-size="11" text-anchor="end" font-family="Oswald">${brl(max)}</text>
+    <text x="${pad.l - 8}" y="${y(min) + 4}" fill="var(--cinza)" font-size="11" text-anchor="end" font-family="Oswald">${brl(min)}</text>
+    <path d="${area}" fill="${cor}" opacity="0.12"/>
+    <path d="${linha}" fill="none" stroke="${cor}" stroke-width="2.5" stroke-linejoin="round"/>
+    ${pts.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.v)}" r="3" fill="${cor}"/>`).join('')}
+    ${labelsX}
+  </svg>
+  <div style="text-align:center;font-size:13px;color:var(--cinza);margin-top:6px">Lucro acumulado no período: <strong class="${acc >= 0 ? 'pos' : 'neg'}">${brl(acc)}</strong></div>`;
+}
+
+// ===== Comparativos: dia, semana e mês contra o período anterior =====
+function somaLucroEntre(de, ate) {
+  return apostas.filter(a => a.data_aposta >= de && a.data_aposta <= ate)
+    .reduce((acc, a) => { acc.lucro += Number(a.lucro); acc.qtd++; if (a.resultado === 'ganhou') acc.g++; if (a.resultado === 'ganhou' || a.resultado === 'perdeu') acc.f++; return acc; },
+      { lucro: 0, qtd: 0, g: 0, f: 0 });
+}
+function isoDate(d) { return d.toISOString().slice(0, 10); }
+
+function renderComparativos() {
+  const cont = $('comparativos'); if (!cont) return;
+  const hj = new Date();
+  // DIA
+  const ontem = new Date(hj.getTime() - 864e5);
+  const dia = somaLucroEntre(isoDate(hj), isoDate(hj));
+  const diaAnt = somaLucroEntre(isoDate(ontem), isoDate(ontem));
+  // SEMANA (segunda a domingo)
+  const diaSem = (hj.getDay() + 6) % 7; // 0 = segunda
+  const ini = new Date(hj.getTime() - diaSem * 864e5);
+  const iniAnt = new Date(ini.getTime() - 7 * 864e5);
+  const fimAnt = new Date(ini.getTime() - 864e5);
+  const sem = somaLucroEntre(isoDate(ini), isoDate(hj));
+  const semAnt = somaLucroEntre(isoDate(iniAnt), isoDate(fimAnt));
+  // MÊS
+  const iniMes = new Date(hj.getFullYear(), hj.getMonth(), 1);
+  const iniMesAnt = new Date(hj.getFullYear(), hj.getMonth() - 1, 1);
+  const fimMesAnt = new Date(hj.getFullYear(), hj.getMonth(), 0);
+  const mes = somaLucroEntre(isoDate(iniMes), isoDate(hj));
+  const mesAnt = somaLucroEntre(isoDate(iniMesAnt), isoDate(fimMesAnt));
+
+  cont.innerHTML = [
+    cardComp('Hoje', dia, diaAnt, 'ontem'),
+    cardComp('Esta semana', sem, semAnt, 'semana passada'),
+    cardComp('Este mês', mes, mesAnt, 'mês passado')
+  ].join('');
+}
+function cardComp(titulo, atual, anterior, refLabel) {
+  const cls = atual.lucro >= 0 ? 'pos' : 'neg';
+  const diff = atual.lucro - anterior.lucro;
+  const seta = diff > 0 ? '▲' : diff < 0 ? '▼' : '–';
+  const dcls = diff > 0 ? 'pos' : diff < 0 ? 'neg' : '';
+  const taxa = atual.f ? Math.round(atual.g / atual.f * 100) : 0;
+  return `<div class="comp-card">
+    <div class="titulo">${titulo}</div>
+    <div class="valor num ${cls}">${brl(atual.lucro)}</div>
+    <div class="delta ${dcls}">${seta} ${brl(Math.abs(diff))} vs ${refLabel}</div>
+    <div class="sub">${atual.qtd} aposta(s) · ${taxa}% acerto</div>
+  </div>`;
 }
 
 function agrupar(lista, campo, ref, incluirSem) {
@@ -196,13 +320,15 @@ function renderApostas() {
     const tot = lista.reduce((s, a) => s + Number(a.lucro), 0);
     $('filResumo').innerHTML = `${lista.length} aposta(s) · resultado <strong class="${tot >= 0 ? 'pos' : 'neg'}">${brl(tot)}</strong>`;
   }
-  if (!lista.length) { $('tabelaApostas').innerHTML = '<div class="empty">Nenhuma aposta com esses filtros.</div>'; return; }
+  if (!lista.length) { $('tabelaApostas').innerHTML = '<div class="empty">Nenhuma aposta com esses filtros.</div>'; atualizarBarraLote(); return; }
   $('tabelaApostas').innerHTML = `<table class="tbl-apostas"><thead><tr>
-    <th>Data</th><th>Casa</th><th>Grupo</th><th>Descrição</th><th>Valor</th><th>Odd</th><th>Resultado</th><th>Lucro</th><th></th></tr></thead><tbody>${lista.map(a => {
+    <th style="width:32px"></th><th>Data</th><th>Casa</th><th>Grupo</th><th>Descrição</th><th>Valor</th><th>Odd</th><th>Resultado</th><th>Lucro</th><th></th></tr></thead><tbody>${lista.map(a => {
       const d = a.data_aposta.split('-').reverse().join('/');
       const lc = Number(a.lucro) > 0 ? 'pos' : Number(a.lucro) < 0 ? 'neg' : '';
       const label = { ganhou: 'green', perdeu: 'red', devolvida: 'devolvida', pendente: 'pendente' }[a.resultado];
+      const chk = selecionadas.has(a.id) ? 'checked' : '';
       return `<tr>
+        <td data-label="" class="cel-chk"><input type="checkbox" class="chk-aposta" ${chk} onchange="toggleSel('${a.id}',this.checked)"></td>
         <td data-label="Data" class="num">${d}</td>
         <td data-label="Casa" class="cel-casa">${a.casas?.nome || '—'}</td>
         <td data-label="Grupo">${a.grupos?.nome || '—'}</td>
@@ -214,7 +340,39 @@ function renderApostas() {
         <td class="cel-acoes" style="white-space:nowrap"><button class="mini" style="color:var(--dourado)" onclick="editar('${a.id}')">editar</button><button class="mini" onclick="excluirAposta('${a.id}')">excluir</button></td>
       </tr>`;
     }).join('')}</tbody></table>`;
+  atualizarBarraLote();
 }
+
+// ===== Seleção em lote =====
+window.toggleSel = (id, marcado) => {
+  if (marcado) selecionadas.add(id); else selecionadas.delete(id);
+  atualizarBarraLote();
+};
+function atualizarBarraLote() {
+  const barra = $('barraLote'); if (!barra) return;
+  // mantém só ids que ainda estão visíveis
+  const visiveis = new Set(apostasDaAba().map(a => a.id));
+  selecionadas = new Set([...selecionadas].filter(id => visiveis.has(id)));
+  if (!selecionadas.size) { barra.classList.add('hidden'); return; }
+  barra.classList.remove('hidden');
+  $('loteContador').textContent = selecionadas.size + ' selecionada(s)';
+}
+async function aplicarLote(novo) {
+  if (!selecionadas.size) return;
+  const ids = [...selecionadas];
+  for (const id of ids) {
+    const a = apostas.find(x => x.id === id); if (!a) continue;
+    const novoLucro = calcLucro({ resultado: novo, valor: a.valor, retorno_potencial: a.retorno_potencial });
+    await sb.from('apostas').update({ resultado: novo, lucro: novoLucro }).eq('id', id);
+    await ajustarSaldoCasa(a.casa_id, novoLucro - Number(a.lucro));
+  }
+  selecionadas.clear();
+  toast(`${ids.length} aposta(s) atualizada(s).`); await carregar();
+}
+document.querySelectorAll('.lote-acoes button[data-r]').forEach(b => {
+  b.onclick = () => aplicarLote(b.dataset.r);
+});
+$('btnLimparSel') && ($('btnLimparSel').onclick = () => { selecionadas.clear(); renderApostas(); });
 
 // liga os filtros
 ['filCasa', 'filGrupo', 'filResultado', 'filValMin', 'filValMax', 'filDe', 'filAte', 'filBusca'].forEach(id => {
@@ -375,6 +533,69 @@ window.excluirCasa = async (id) => {
   if (!confirm('Excluir a casa e TODAS as apostas dela?')) return;
   await sb.from('casas').delete().eq('id', id); toast('Casa excluída.'); await carregar();
 };
+
+// ============ BANCO / LIMITE / TRANSFERENCIAS ============
+async function salvarConfig(campos) {
+  const { error } = await sb.from('config').upsert({ user_id: user.id, ...campos, atualizado_em: new Date().toISOString() });
+  if (error) { toast('Erro: ' + error.message); return false; }
+  return true;
+}
+function renderBanco() {
+  if ($('bancoSaldo')) $('bancoSaldo').textContent = brl(config.banco || 0);
+  if ($('limiteAtual')) $('limiteAtual').textContent = brl(config.limite_perda_dia || 0);
+  if ($('patrimonioTotal')) $('patrimonioTotal').textContent = brl(patrimonio());
+}
+$('btnSalvarBanco') && ($('btnSalvarBanco').onclick = async () => {
+  const v = Number($('bancoInput').value); if (isNaN(v)) return toast('Valor inválido.');
+  if (await salvarConfig({ banco: v, limite_perda_dia: config.limite_perda_dia || 0 })) { $('bancoInput').value = ''; toast('Banco atualizado.'); await carregar(); }
+});
+$('btnSalvarLimite') && ($('btnSalvarLimite').onclick = async () => {
+  const v = Number($('limiteInput').value); if (isNaN(v) || v < 0) return toast('Valor inválido.');
+  if (await salvarConfig({ banco: config.banco || 0, limite_perda_dia: v })) { $('limiteInput').value = ''; toast('Limite salvo.'); await carregar(); }
+});
+
+// ----- Transferência -----
+function opcoesTransf() {
+  return '<option value="Banco">🏦 Banco</option>' + casas.map(c => `<option value="casa:${c.id}">${c.nome}</option>`).join('');
+}
+$('btnAbrirTransf') && ($('btnAbrirTransf').onclick = () => {
+  if (!casas.length) return toast('Cadastre ao menos uma casa primeiro.');
+  $('tOrigem').innerHTML = opcoesTransf();
+  $('tDestino').innerHTML = opcoesTransf();
+  $('tDestino').selectedIndex = 1;
+  $('tValor').value = '';
+  $('modalTransf').classList.remove('hidden');
+});
+function fecharTransf() { $('modalTransf').classList.add('hidden'); }
+$('btnFecharTransf') && ($('btnFecharTransf').onclick = fecharTransf);
+$('btnCancelarTransf') && ($('btnCancelarTransf').onclick = fecharTransf);
+$('modalTransf') && ($('modalTransf').onclick = (e) => { if (e.target.id === 'modalTransf') fecharTransf(); });
+
+$('btnConfirmarTransf') && ($('btnConfirmarTransf').onclick = async () => {
+  const origem = $('tOrigem').value, destino = $('tDestino').value;
+  const valor = Number($('tValor').value);
+  if (origem === destino) return toast('Origem e destino são iguais.');
+  if (!valor || valor <= 0) return toast('Informe um valor válido.');
+
+  // saldo da origem
+  const saldoOrigem = origem === 'Banco' ? Number(config.banco || 0) : Number(casas.find(c => c.id === origem.slice(5))?.saldo || 0);
+  if (valor > saldoOrigem) return toast('Saldo insuficiente na origem.');
+
+  // aplica
+  let novoBanco = Number(config.banco || 0);
+  if (origem === 'Banco') novoBanco -= valor;
+  if (destino === 'Banco') novoBanco += valor;
+  if (origem === 'Banco' || destino === 'Banco') await salvarConfig({ banco: novoBanco, limite_perda_dia: config.limite_perda_dia || 0 });
+  if (origem.startsWith('casa:')) await ajustarSaldoCasa(origem.slice(5), -valor);
+  if (destino.startsWith('casa:')) await ajustarSaldoCasa(destino.slice(5), valor);
+
+  // registra histórico
+  const nomeDe = origem === 'Banco' ? 'Banco' : (casas.find(c => c.id === origem.slice(5))?.nome || '—');
+  const nomePara = destino === 'Banco' ? 'Banco' : (casas.find(c => c.id === destino.slice(5))?.nome || '—');
+  await sb.from('transferencias').insert({ origem: nomeDe, destino: nomePara, valor, user_id: user.id });
+
+  fecharTransf(); toast(`Transferido ${brl(valor)} de ${nomeDe} para ${nomePara}.`); await carregar();
+});
 
 // ============ GRUPOS ============
 function renderGrupos() {

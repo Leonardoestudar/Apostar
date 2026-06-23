@@ -196,3 +196,49 @@ body.logado #authScreen{display:none}
   .lista-casas{grid-template-columns:1fr}
   .menu-result button{padding:12px 20px;font-size:15px}
 }
+
+/* ===== CAIXA BANCO / LIMITE ===== */
+.banco-box{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.banco-saldo{background:#0c1310;border:1px solid var(--linha);border-radius:13px;padding:16px}
+.banco-saldo.destaque{border-color:var(--dourado-2)}
+.banco-saldo small{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--cinza);display:block;margin-bottom:6px}
+.banco-saldo .num{font-family:'Oswald';font-size:26px;font-weight:700}
+.banco-saldo .saldo-edit{display:flex;gap:6px;margin-top:10px}
+.banco-saldo .saldo-edit input{padding:7px 10px;font-size:13px}
+
+/* ===== ALERTA LIMITE ===== */
+.alerta-limite{border-radius:13px;padding:14px 18px;margin-bottom:16px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:10px}
+.alerta-limite.aviso{background:rgba(199,184,120,.13);border:1px solid var(--pendente);color:var(--pendente)}
+.alerta-limite.estouro{background:rgba(240,104,107,.13);border:1px solid var(--vermelho);color:var(--vermelho)}
+
+/* ===== GRAFICO ===== */
+#grafico{width:100%;overflow-x:auto}
+.graf-svg{display:block;width:100%;height:auto}
+
+/* ===== COMPARATIVO ===== */
+.grid-comp{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.comp-card{background:#0c1310;border:1px solid var(--linha);border-radius:13px;padding:16px}
+.comp-card .titulo{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--cinza);margin-bottom:8px}
+.comp-card .valor{font-family:'Oswald';font-size:24px;font-weight:700}
+.comp-card .delta{font-size:13px;margin-top:6px}
+.comp-card .sub{font-size:12px;color:var(--cinza);margin-top:4px}
+
+/* ===== BARRA DE LOTE ===== */
+.barra-lote{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--feltro);border:1px solid var(--dourado-2);border-radius:11px;padding:10px 14px;margin-bottom:14px;flex-wrap:wrap}
+.barra-lote #loteContador{font-weight:600;font-size:14px}
+.lote-acoes{display:flex;gap:8px;flex-wrap:wrap}
+.lote-acoes button{border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.lote-acoes .ghost{background:transparent;border:1px solid var(--linha);color:var(--cinza);font-weight:600}
+.chk-aposta{width:18px;height:18px;accent-color:var(--dourado);cursor:pointer}
+
+@media(max-width:900px){
+  .banco-box{grid-template-columns:1fr}
+  .grid-comp{grid-template-columns:1fr}
+}
+
+/* checkbox na tabela */
+.cel-chk{text-align:center}
+@media(max-width:600px){
+  .tbl-apostas td.cel-chk{justify-content:flex-start}
+  .tbl-apostas td.cel-chk::before{content:'Selecionar';color:var(--cinza)}
+}
